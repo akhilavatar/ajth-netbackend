@@ -1,4 +1,4 @@
-import {
+ import {
   CameraControls,
   ContactShadows,
   Environment,
@@ -17,6 +17,7 @@ export const Experience = () => {
       cameraControls.current.setLookAt(0, 1.5, 1.5, 0, 1.5, 0);
     }
   }, []);
+  
 
   return (
     <>

@@ -4,40 +4,57 @@ import { button, useControls } from "leva";
 import React, { useEffect, useRef, useState } from "react";
 import { useChat } from "../hooks/useChat";
 import { useFacialExpressions } from "../hooks/useFacialExpressions";
+import { useAudio } from "../hooks/useAudio";
+import { useLipSync } from "../hooks/useLipSync";
 import { filterEndTracks } from "../utils/animations";
 
 export function Avatar(props) {
-  const { nodes, materials, scene } = useGLTF("/models/64f1a714fe61576b46f27ca2.glb");
+  const { nodes, materials, scene } = useGLTF("/models/avatar1.glb");
   const { animations: originalAnimations } = useGLTF("/models/animations.glb");
   const animations = filterEndTracks(originalAnimations);
   const group = useRef();
   const { actions } = useAnimations(animations, group);
   const [animation, setAnimation] = useState("Standing Idle");
-  const { message, onMessagePlayed } = useChat();
+  const { message } = useChat();
+  const [blink, setBlink] = useState(false);
+  const blinkTimeout = useRef();
   
   const { currentExpression, setupMode, setupControls } = useFacialExpressions(nodes);
+  const { currentViseme } = useLipSync();
 
   useEffect(() => {
-    actions[animation]?.reset().fadeIn(0.5).play();
-    return () => {
-      actions[animation]?.fadeOut(0.5);
-    };
-  }, [animation]);
-
-  useEffect(() => {
-    if (message) {
-      setAnimation("Talking_0");
-      const timeout = setTimeout(() => {
-        setAnimation("Standing Idle");
-        onMessagePlayed();
-      }, 2000);
-      return () => {
-        clearTimeout(timeout);
-      };
+    if (!message) {
+      setAnimation("Standing Idle");
+      return;
     }
+    setAnimation(message.animation || "Talking_0");
   }, [message]);
 
-  // Animation controls
+  // Blinking logic...
+  useEffect(() => {
+    const handleBlink = () => {
+      setBlink(true);
+      blinkTimeout.current = setTimeout(() => {
+        setBlink(false);
+        scheduleNextBlink();
+      }, 200);
+    };
+
+    const scheduleNextBlink = () => {
+      const timeout = setTimeout(handleBlink, Math.random() * 5000 + 2000);
+      blinkTimeout.current = timeout;
+    };
+
+    scheduleNextBlink();
+
+    return () => {
+      if (blinkTimeout.current) {
+        clearTimeout(blinkTimeout.current);
+      }
+    };
+  }, []);
+
+  // Animation controls...
   useControls({
     Animation: {
       value: animation,
@@ -48,15 +65,44 @@ export function Avatar(props) {
     },
   });
 
-  // Apply setup controls in real-time when in setup mode
+  useEffect(() => {
+    actions[animation]?.reset().fadeIn(0.5).play();
+    return () => {
+      actions[animation]?.fadeOut(0.5);
+    };
+  }, [animation]);
+
+  // Apply morphs in real-time
   useFrame(() => {
-    if (setupMode && nodes?.Wolf3D_Head) {
+    if (!nodes?.Wolf3D_Head) return;
+
+    // Reset all morph targets
+    nodes.Wolf3D_Head.morphTargetInfluences.fill(0);
+
+    // Apply setup controls
+    if (setupMode) {
       Object.entries(setupControls).forEach(([key, value]) => {
         const idx = nodes.Wolf3D_Head.morphTargetDictionary[key];
         if (typeof idx !== 'undefined') {
           nodes.Wolf3D_Head.morphTargetInfluences[idx] = value;
         }
       });
+    }
+
+    // Apply blinking
+    const blinkIdx = nodes.Wolf3D_Head.morphTargetDictionary.eyeBlinkLeft;
+    const blinkRightIdx = nodes.Wolf3D_Head.morphTargetDictionary.eyeBlinkRight;
+    if (typeof blinkIdx !== 'undefined' && typeof blinkRightIdx !== 'undefined') {
+      nodes.Wolf3D_Head.morphTargetInfluences[blinkIdx] = blink ? 1 : 0;
+      nodes.Wolf3D_Head.morphTargetInfluences[blinkRightIdx] = blink ? 1 : 0;
+    }
+
+    // Apply lip sync
+    if (currentViseme) {
+      const visemeIdx = nodes.Wolf3D_Head.morphTargetDictionary[currentViseme];
+      if (typeof visemeIdx !== 'undefined') {
+        nodes.Wolf3D_Head.morphTargetInfluences[visemeIdx] = 1;
+      }
     }
   });
 
