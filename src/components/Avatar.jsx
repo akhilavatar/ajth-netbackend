@@ -9,7 +9,7 @@ import { useLipSync } from "../hooks/useLipSync";
 import { filterEndTracks } from "../utils/animations";
 
 export function Avatar(props) {
-  const { nodes, materials, scene } = useGLTF("/models/avatar1.glb");
+  const { nodes, materials, scene } = useGLTF("/models/64f1a714fe61576b46f27ca2.glb");
   const { animations: originalAnimations } = useGLTF("/models/animations.glb");
   const animations = filterEndTracks(originalAnimations);
   const group = useRef();
