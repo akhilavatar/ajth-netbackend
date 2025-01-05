@@ -5,6 +5,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useChat } from "../hooks/useChat";
 import { useFacialExpressions } from "../hooks/useFacialExpressions";
 import { useBlinking } from "../hooks/useBlinking";
+import { useLipSync } from "../hooks/useLipSync";
 import { filterEndTracks } from "../utils/animations";
 import { applyMorphTarget } from "../utils/morphTargets";
 
@@ -17,6 +18,7 @@ export function Avatar(props) {
   const [animation, setAnimation] = useState("Standing Idle");
   const { message, onMessagePlayed } = useChat();
   const { blink } = useBlinking();
+  const { currentViseme } = useLipSync();
   
   const { currentExpression, setupMode, setupControls } = useFacialExpressions(nodes);
 
@@ -61,6 +63,19 @@ export function Avatar(props) {
     if (nodes.Wolf3D_Head) {
       applyMorphTarget(nodes.Wolf3D_Head, 'eyeBlinkLeft', blink ? 1 : 0);
       applyMorphTarget(nodes.Wolf3D_Head, 'eyeBlinkRight', blink ? 1 : 0);
+    }
+
+    // Apply lip sync
+    if (currentViseme && nodes.Wolf3D_Head) {
+      // Reset previous visemes
+      Object.keys(nodes.Wolf3D_Head.morphTargetDictionary)
+        .filter(key => key.startsWith('viseme_'))
+        .forEach(key => {
+          applyMorphTarget(nodes.Wolf3D_Head, key, 0);
+        });
+      
+      // Apply current viseme
+      applyMorphTarget(nodes.Wolf3D_Head, currentViseme, 1);
     }
   });
 
