@@ -4,7 +4,9 @@ import { button, useControls } from "leva";
 import React, { useEffect, useRef, useState } from "react";
 import { useChat } from "../hooks/useChat";
 import { useFacialExpressions } from "../hooks/useFacialExpressions";
+import { useBlinking } from "../hooks/useBlinking";
 import { filterEndTracks } from "../utils/animations";
+import { applyMorphTarget } from "../utils/morphTargets";
 
 export function Avatar(props) {
   const { nodes, materials, scene } = useGLTF("/models/64f1a714fe61576b46f27ca2.glb");
@@ -14,6 +16,7 @@ export function Avatar(props) {
   const { actions } = useAnimations(animations, group);
   const [animation, setAnimation] = useState("Standing Idle");
   const { message, onMessagePlayed } = useChat();
+  const { blink } = useBlinking();
   
   const { currentExpression, setupMode, setupControls } = useFacialExpressions(nodes);
 
@@ -37,7 +40,6 @@ export function Avatar(props) {
     }
   }, [message]);
 
-  // Animation controls
   useControls({
     Animation: {
       value: animation,
@@ -48,15 +50,17 @@ export function Avatar(props) {
     },
   });
 
-  // Apply setup controls in real-time when in setup mode
   useFrame(() => {
     if (setupMode && nodes?.Wolf3D_Head) {
       Object.entries(setupControls).forEach(([key, value]) => {
-        const idx = nodes.Wolf3D_Head.morphTargetDictionary[key];
-        if (typeof idx !== 'undefined') {
-          nodes.Wolf3D_Head.morphTargetInfluences[idx] = value;
-        }
+        applyMorphTarget(nodes.Wolf3D_Head, key, value);
       });
+    }
+
+    // Apply blinking
+    if (nodes.Wolf3D_Head) {
+      applyMorphTarget(nodes.Wolf3D_Head, 'eyeBlinkLeft', blink ? 1 : 0);
+      applyMorphTarget(nodes.Wolf3D_Head, 'eyeBlinkRight', blink ? 1 : 0);
     }
   });
 
@@ -132,6 +136,3 @@ export function Avatar(props) {
     </group>
   );
 }
-
-useGLTF.preload("/models/64f1a714fe61576b46f27ca2.glb");
-useGLTF.preload("/models/animations.glb");
