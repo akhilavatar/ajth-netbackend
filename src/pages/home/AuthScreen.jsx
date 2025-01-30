@@ -15,7 +15,7 @@ const AuthScreen = () => {
 		<div className='hero-bg relative'>
 			{/* Navbar */}
 			<header className='max-w-6xl mx-auto flex items-center justify-between p-4 pb-10'>
-				<img src='/netflix-logo.png' alt='Netflix Logo' className='w-32 md:w-52' />
+				<img src='/netflix/netflix-logo.png' alt='Netflix Logo' className='w-32 md:w-52' />
 				<Link to={"/login"} className='text-white bg-red-600 py-1 px-2 rounded'>
 					Sign In
 				</Link>
@@ -57,7 +57,7 @@ const AuthScreen = () => {
 					</div>
 					{/* right side */}
 					<div className='flex-1 relative'>
-						<img src='/tv.png' alt='Tv image' className='mt-4 z-20 relative' />
+						<img src='/netflix/tv.png' alt='Tv image' className='mt-4 z-20 relative' />
 						<video
 							className='absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-1/2 z-10'
 							playsInline
@@ -65,7 +65,7 @@ const AuthScreen = () => {
 							muted
 							loop
 						>
-							<source src='/hero-vid.m4v' type='video/mp4' />
+							<source src='/netflix/hero-vid.m4v' type='video/mp4' />
 						</video>
 					</div>
 				</div>
@@ -80,21 +80,21 @@ const AuthScreen = () => {
 					{/* left side */}
 					<div className='flex-1 relative'>
 						<div className='relative'>
-							<img src='/stranger-things-lg.png' alt='Stranger Things img' className='mt-4' />
+							<img src='/netflix/stranger-things-lg.png' alt='Stranger Things img' className='mt-4' />
 
 							<div
 								className='flex items-center gap-2 absolute bottom-5 left-1/2 -translate-x-1/2 bg-black
               w-3/4 lg:w-1/2 h-24 border border-slate-500 rounded-md px-2
               '
 							>
-								<img src='/stranger-things-sm.png' alt='image' className='h-full' />
+								<img src='/netflix/stranger-things-sm.png' alt='image' className='h-full' />
 								<div className=' flex justify-between items-center w-full'>
 									<div className='flex flex-col gap-0'>
 										<span className='text-md lg:text-lg font-bold'>Stranger Things</span>
 										<span className='text-sm text-blue-500'>Downloading...</span>
 									</div>
 
-									<img src='/download-icon.gif' alt='' className='h-12' />
+									<img src='/netflix/download-icon.gif' alt='' className='h-12' />
 								</div>
 							</div>
 						</div>
@@ -129,7 +129,7 @@ const AuthScreen = () => {
 
 					{/* right side */}
 					<div className='flex-1 relative overflow-hidden'>
-						<img src='/device-pile.png' alt='Device image' className='mt-4 z-20 relative' />
+						<img src='/netflix/device-pile.png' alt='Device image' className='mt-4 z-20 relative' />
 						<video
 							className='absolute top-2 left-1/2 -translate-x-1/2  h-4/6 z-10
                max-w-[63%] 
@@ -139,7 +139,7 @@ const AuthScreen = () => {
 							muted
 							loop
 						>
-							<source src='/video-devices.m4v' type='video/mp4' />
+							<source src='/netflix/video-devices.m4v' type='video/mp4' />
 						</video>
 					</div>
 				</div>
@@ -156,7 +156,7 @@ const AuthScreen = () => {
 				>
 					{/* left */}
 					<div className='flex-1 relative'>
-						<img src='/kids.png' alt='Enjoy on your TV' className='mt-4' />
+						<img src='/netflix/kids.png' alt='Enjoy on your TV' className='mt-4' />
 					</div>
 					{/* right */}
 					<div className='flex-1 text-center md:text-left'>

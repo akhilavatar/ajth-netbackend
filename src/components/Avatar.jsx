@@ -10,7 +10,7 @@ import { filterEndTracks } from "../utils/animations";
 import { applyMorphTarget } from "../utils/morphTargets";
 
 export function Avatar(props) {
-  const { nodes, materials, scene } = useGLTF("/models/678250d39d91f0cde79136f6.glb");
+  const { nodes, materials, scene } = useGLTF("/models/Netflix.glb");
   const { animations: originalAnimations } = useGLTF("/models/animations.glb");
   const animations = filterEndTracks(originalAnimations);
   const group = useRef();

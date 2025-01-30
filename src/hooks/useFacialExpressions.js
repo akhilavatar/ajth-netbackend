@@ -1,17 +1,22 @@
 import { useEffect, useState } from 'react';
-import { useControls } from 'leva';
+import { useControls, folder } from 'leva';
 import { facialExpressions } from '../constants/facialExpressions';
 
 export const useFacialExpressions = (nodes) => {
   const [currentExpression, setCurrentExpression] = useState('default');
-  const [setupMode, setSetupMode] = useState(false);
 
   const { expression, setupModeEnabled } = useControls({
-    expression: {
-      value: 'default',
-      options: Object.keys(facialExpressions),
-    },
-    setupModeEnabled: false,
+    'Facial Controls': folder({
+      expression: {
+        value: 'default',
+        options: Object.keys(facialExpressions),
+        label: 'Expression'
+      },
+      setupModeEnabled: {
+        value: false,
+        label: 'Setup Mode'
+      }
+    })
   });
 
   useEffect(() => {
@@ -47,28 +52,27 @@ export const useFacialExpressions = (nodes) => {
     });
   }, [currentExpression, nodes]);
 
-  // Return setup mode controls if enabled
-  const setupControls = useControls(
-    'Expression Setup',
-    setupModeEnabled ? 
-      Object.fromEntries(
-        Object.keys(nodes?.Wolf3D_Head?.morphTargetDictionary || {}).map(key => [
-          key,
-          {
-            value: 0,
-            min: 0,
-            max: 1,
-            step: 0.01,
-          },
-        ])
-      ) : 
-      {},
-    [setupModeEnabled, nodes]
+  const morphControls = useControls(
+    'Morph Controls',
+    setupModeEnabled
+      ? Object.fromEntries(
+          Object.keys(nodes?.Wolf3D_Head?.morphTargetDictionary || {}).map(key => [
+            key,
+            {
+              value: 0,
+              min: 0,
+              max: 1,
+              step: 0.01,
+            },
+          ])
+        )
+      : {},
+    { collapsed: true }
   );
 
   return {
     currentExpression,
     setupMode: setupModeEnabled,
-    setupControls,
+    setupControls: setupModeEnabled ? morphControls : {},
   };
 };
