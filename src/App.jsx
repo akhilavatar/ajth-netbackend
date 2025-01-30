@@ -12,11 +12,13 @@ import SearchHistoryPage from "./pages/SearchHistoryPage";
 import WatchPage from "./pages/WatchPage";
 import NotFoundPage from "./pages/404";
 import { Toaster } from "react-hot-toast";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useAuthStore } from "./store/authUser";
+import PermissionsModal from "./components/PermissionsModal";
 
 function App() {
   const { authCheck } = useAuthStore();
+  const [showPermissions, setShowPermissions] = useState(true);
 
   useEffect(() => {
     authCheck();
@@ -51,6 +53,10 @@ function App() {
             <Experience />
           </Canvas>
         </div>
+
+        {showPermissions && (
+          <PermissionsModal onClose={() => setShowPermissions(false)} />
+        )}
 
         <Toaster position="bottom-center" />
       </div>
