@@ -14,7 +14,7 @@ export const Experience = () => {
 
   useEffect(() => {
     if (cameraControls.current) {
-      cameraControls.current.setLookAt(0, 1.5, 1.5, 0, 1.5, 0);
+      cameraControls.current.setLookAt(0, 1.5, 3, 0, 1.5, 0);
     }
   }, []);
 
@@ -24,7 +24,7 @@ export const Experience = () => {
       <Environment preset="sunset" />
       {showAvatar && (
         <Suspense>
-          <Avatar position={[0, 1, -0.5]} scale={0.5} />
+          <Avatar position={[0, 1, 0]} scale={1} />
           <Dots position-y={1.0} position-x={-0.02} />
         </Suspense>
       )}

@@ -5,13 +5,19 @@ import { useKeyboardControls } from "../hooks/useKeyboardControls";
 import { Header } from "./Header";
 import { ChatInput } from "./ChatInput";
 import { ChatButton } from "./UI/ChatButton";
+import { useLocation } from 'react-router-dom';
 
 export const UI = ({ hidden }) => {
   const input = useRef();
   const { chat, loading, message } = useChat();
   const { showAvatar, setShowAvatar } = useAvatar();
+  const location = useLocation();
   
   useKeyboardControls();
+
+  // Hide avatar chat on certain pages
+  const hideOnPaths = ['/login', '/signup'];
+  if (hideOnPaths.includes(location.pathname)) return null;
 
   const sendMessage = () => {
     const text = input.current?.value;
@@ -24,9 +30,9 @@ export const UI = ({ hidden }) => {
   if (hidden) return null;
 
   return (
-    <div className="fixed inset-0 z-10 pointer-events-none">
+    <div className="fixed inset-0 z-50 pointer-events-none">
       {showAvatar ? (
-        <div className="w-[75%] h-[75%] absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col justify-between">
+        <div className="w-full h-full absolute top-0 left-0 flex flex-col justify-between p-8">
           <Header onClose={() => setShowAvatar(false)} />
           <ChatInput 
             inputRef={input}
@@ -40,4 +46,4 @@ export const UI = ({ hidden }) => {
       )}
     </div>
   );
-}
+};
