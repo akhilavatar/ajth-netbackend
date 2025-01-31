@@ -1,19 +1,34 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useChat } from './useChat';
 
 export const useAudio = () => {
   const [audio, setAudio] = useState(null);
   const { message } = useChat();
+  const audioRef = useRef(null);
 
   useEffect(() => {
-    if (!message?.audio) return;
+    if (!message?.audio) {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      setAudio(null);
+      return;
+    }
 
     const newAudio = new Audio(message.audio);
+    audioRef.current = newAudio;
     setAudio(newAudio);
-    newAudio.play();
+
+    newAudio.addEventListener('canplaythrough', () => {
+      newAudio.play().catch(console.error);
+    });
 
     return () => {
-      newAudio.pause();
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
       setAudio(null);
     };
   }, [message]);

@@ -13,10 +13,14 @@ export const ChatProvider = ({ children }) => {
   const { setContentType } = useContentStore();
   const navigate = useNavigate();
   const [chatHistory, setChatHistory] = useState([]);
+  const [messages, setMessages] = useState([]);
+  const [message, setMessage] = useState();
+  const [loading, setLoading] = useState(false);
+  const [cameraZoomed, setCameraZoomed] = useState(true);
   
   const synthesizeSpeech = async (text) => {
     try {
-      const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}`, {
+      const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}/stream`, {
         method: 'POST',
         headers: {
           'Accept': 'audio/mpeg',
@@ -27,11 +31,17 @@ export const ChatProvider = ({ children }) => {
           text,
           model_id: 'eleven_monolingual_v1',
           voice_settings: {
-            stability: 0.5,
-            similarity_boost: 0.5
+            stability: 0.75,
+            similarity_boost: 0.75,
+            style: 0.5,
+            use_speaker_boost: true
           }
         })
       });
+
+      if (!response.ok) {
+        throw new Error('Speech synthesis failed');
+      }
 
       const blob = await response.blob();
       return URL.createObjectURL(blob);
@@ -60,12 +70,14 @@ export const ChatProvider = ({ children }) => {
           
           // Generate speech for the response
           const audioUrl = await synthesizeSpeech(response);
+          if (!audioUrl) throw new Error('Failed to generate speech');
           
           setMessages([{
             text: response,
             searchResult: content,
             type: 'movie',
-            audio: audioUrl
+            audio: audioUrl,
+            lipsync: await generateLipSync(response)
           }]);
           
           // Add response to chat history
@@ -83,12 +95,14 @@ export const ChatProvider = ({ children }) => {
           
           // Generate speech for the response
           const audioUrl = await synthesizeSpeech(response);
+          if (!audioUrl) throw new Error('Failed to generate speech');
           
           setMessages([{
             text: response,
             searchResult: content,
             type: 'tv',
-            audio: audioUrl
+            audio: audioUrl,
+            lipsync: await generateLipSync(response)
           }]);
           
           // Add response to chat history
@@ -99,10 +113,12 @@ export const ChatProvider = ({ children }) => {
 
         const notFoundResponse = "I couldn't find any movies or TV shows matching your search. Please try a different search term.";
         const audioUrl = await synthesizeSpeech(notFoundResponse);
+        if (!audioUrl) throw new Error('Failed to generate speech');
         
         setMessages([{
           text: notFoundResponse,
-          audio: audioUrl
+          audio: audioUrl,
+          lipsync: await generateLipSync(notFoundResponse)
         }]);
         
         // Add response to chat history
@@ -116,10 +132,12 @@ export const ChatProvider = ({ children }) => {
         const content = messages[0].searchResult;
         const response = `Great! Taking you to watch ${content.title || content.name}.`;
         const audioUrl = await synthesizeSpeech(response);
+        if (!audioUrl) throw new Error('Failed to generate speech');
         
         setMessages([{
           text: response,
-          audio: audioUrl
+          audio: audioUrl,
+          lipsync: await generateLipSync(response)
         }]);
         
         // Add response to chat history
@@ -137,17 +155,29 @@ export const ChatProvider = ({ children }) => {
         },
         body: JSON.stringify({ message }),
       });
+      
+      if (!data.ok) {
+        throw new Error('Chat request failed');
+      }
+      
       const resp = (await data.json()).messages;
       
-      // Generate speech for each message
+      // Generate speech and lipsync for each message
       const messagesWithAudio = await Promise.all(
-        resp.map(async (msg) => ({
-          ...msg,
-          audio: await synthesizeSpeech(msg.text)
-        }))
+        resp.map(async (msg) => {
+          const audioUrl = await synthesizeSpeech(msg.text);
+          if (!audioUrl) throw new Error('Failed to generate speech');
+          
+          const lipsync = await generateLipSync(msg.text);
+          return {
+            ...msg,
+            audio: audioUrl,
+            lipsync
+          };
+        })
       );
       
-      setMessages((messages) => [...messages, ...messagesWithAudio]);
+      setMessages(messagesWithAudio);
       
       // Add responses to chat history
       setChatHistory(prev => [
@@ -159,12 +189,31 @@ export const ChatProvider = ({ children }) => {
       ]);
       
     } catch (error) {
+      console.error('Chat error:', error);
       const errorMessage = "I'm sorry, I encountered an error. Please try again.";
-      const audioUrl = await synthesizeSpeech(errorMessage);
+      
+      // Ensure we get audio for the error message
+      let audioUrl;
+      let retries = 3;
+      while (retries > 0 && !audioUrl) {
+        audioUrl = await synthesizeSpeech(errorMessage);
+        retries--;
+        if (!audioUrl) {
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
+        }
+      }
+      
+      if (!audioUrl) {
+        console.error('Failed to generate speech for error message after retries');
+        return;
+      }
+      
+      const lipsync = await generateLipSync(errorMessage);
       
       setMessages([{
         text: errorMessage,
-        audio: audioUrl
+        audio: audioUrl,
+        lipsync
       }]);
       
       // Add error response to chat history
@@ -175,11 +224,24 @@ export const ChatProvider = ({ children }) => {
     }
   };
 
-  const [messages, setMessages] = useState([]);
-  const [message, setMessage] = useState();
-  const [loading, setLoading] = useState(false);
-  const [cameraZoomed, setCameraZoomed] = useState(true);
-  
+  const generateLipSync = async (text) => {
+    try {
+      // This is a placeholder - replace with actual API call to get phoneme timing
+      const phonemes = text.split('').map((char, index) => ({
+        value: char.toUpperCase(),
+        start: index * 0.1,
+        end: (index + 1) * 0.1
+      }));
+
+      return {
+        mouthCues: phonemes
+      };
+    } catch (error) {
+      console.error('Lip sync generation failed:', error);
+      return null;
+    }
+  };
+
   const onMessagePlayed = () => {
     setMessages((messages) => messages.slice(1));
   };

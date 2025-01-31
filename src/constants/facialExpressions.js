@@ -79,14 +79,51 @@ export const facialExpressions = {
   },
 };
 
+// Enhanced viseme map with more precise mouth shapes
 export const visemeMap = {
-  A: "viseme_PP",
-  B: "viseme_kk",
-  C: "viseme_I",
-  D: "viseme_AA",
-  E: "viseme_O",
-  F: "viseme_U",
-  G: "viseme_FF",
-  H: "viseme_TH",
-  X: "viseme_PP",
+  // Silence
+  'sil': 'viseme_sil',
+  
+  // Vowels
+  'AA': 'viseme_AA', // "car"
+  'AE': 'viseme_AA', // "cat"
+  'AH': 'viseme_AA', // "cut"
+  'AO': 'viseme_O',  // "dog"
+  'AW': 'viseme_O',  // "cow"
+  'AY': 'viseme_I',  // "hide"
+  'EH': 'viseme_E',  // "pet"
+  'ER': 'viseme_E',  // "bird"
+  'EY': 'viseme_E',  // "say"
+  'IH': 'viseme_I',  // "sit"
+  'IY': 'viseme_I',  // "see"
+  'OW': 'viseme_O',  // "go"
+  'OY': 'viseme_O',  // "boy"
+  'UH': 'viseme_U',  // "book"
+  'UW': 'viseme_U',  // "boot"
+
+  // Consonants
+  'B': 'viseme_PP',  // "buy"
+  'CH': 'viseme_CH', // "cheese"
+  'D': 'viseme_DD',  // "dig"
+  'DH': 'viseme_TH', // "this"
+  'F': 'viseme_FF',  // "fan"
+  'G': 'viseme_kk',  // "game"
+  'HH': 'viseme_sil', // "help"
+  'JH': 'viseme_CH', // "jump"
+  'K': 'viseme_kk',  // "cat"
+  'L': 'viseme_DD',  // "lip"
+  'M': 'viseme_PP',  // "man"
+  'N': 'viseme_DD',  // "no"
+  'NG': 'viseme_kk', // "sing"
+  'P': 'viseme_PP',  // "pan"
+  'R': 'viseme_R',   // "red"
+  'S': 'viseme_SS',  // "sit"
+  'SH': 'viseme_CH', // "she"
+  'T': 'viseme_DD',  // "top"
+  'TH': 'viseme_TH', // "thin"
+  'V': 'viseme_FF',  // "van"
+  'W': 'viseme_U',   // "wet"
+  'Y': 'viseme_I',   // "yes"
+  'Z': 'viseme_SS',  // "zip"
+  'ZH': 'viseme_CH', // "measure"
 };

@@ -1,18 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useChat } from './useChat';
 import { useAudio } from './useAudio';
-
-const corresponding = {
-  A: "viseme_PP",
-  B: "viseme_kk",
-  C: "viseme_I",
-  D: "viseme_AA",
-  E: "viseme_O",
-  F: "viseme_U",
-  G: "viseme_FF",
-  H: "viseme_TH",
-  X: "viseme_PP",
-};
+import { visemeMap } from '../constants/facialExpressions';
 
 export const useLipSync = () => {
   const [currentViseme, setCurrentViseme] = useState(null);
@@ -20,26 +9,55 @@ export const useLipSync = () => {
   const { audio } = useAudio();
 
   useEffect(() => {
-    if (!audio || !message?.lipsync) return;
+    if (!audio || !message?.text) {
+      setCurrentViseme(null);
+      return;
+    }
+
+    let lastViseme = null;
+    let transitionTimer = null;
 
     const updateMouthShape = () => {
-      const currentTime = audio.currentTime;
-      const currentCue = message.lipsync.mouthCues.find(
-        cue => currentTime >= cue.start && currentTime <= cue.end
-      );
-
-      if (currentCue) {
-        setCurrentViseme(corresponding[currentCue.value]);
-      } else {
+      if (!audio.duration || audio.paused) {
         setCurrentViseme(null);
+        return;
+      }
+
+      // Calculate viseme based on current playback position
+      const progress = audio.currentTime / audio.duration;
+      const textLength = message.text.length;
+      const currentCharIndex = Math.floor(progress * textLength);
+      
+      if (currentCharIndex < textLength) {
+        const currentChar = message.text[currentCharIndex].toUpperCase();
+        const targetViseme = visemeMap[currentChar] || 'viseme_sil';
+
+        if (targetViseme !== lastViseme) {
+          if (transitionTimer) clearTimeout(transitionTimer);
+          
+          setCurrentViseme(targetViseme);
+          lastViseme = targetViseme;
+
+          // Smooth transition
+          transitionTimer = setTimeout(() => {
+            setCurrentViseme('viseme_sil');
+          }, 50);
+        }
+      } else {
+        setCurrentViseme('viseme_sil');
       }
     };
 
-    const intervalId = setInterval(updateMouthShape, 1000 / 60); // 60fps update
+    const intervalId = setInterval(updateMouthShape, 1000 / 60);
+
+    audio.addEventListener('ended', () => {
+      setCurrentViseme('viseme_sil');
+    });
 
     return () => {
       clearInterval(intervalId);
-      setCurrentViseme(null);
+      if (transitionTimer) clearTimeout(transitionTimer);
+      setCurrentViseme('viseme_sil');
     };
   }, [audio, message]);
 
