@@ -4,6 +4,7 @@ import { useAvatar } from "../hooks/useAvatar";
 import { useKeyboardControls } from "../hooks/useKeyboardControls";
 import { Header } from "./Header";
 import { ChatInput } from "./ChatInput";
+import { ChatHistory } from "./ChatHistory";
 import { ChatButton } from "./UI/ChatButton";
 import { useLocation } from 'react-router-dom';
 
@@ -34,6 +35,7 @@ export const UI = ({ hidden }) => {
       {showAvatar ? (
         <div className="w-full h-full absolute top-0 left-0 flex flex-col justify-between p-8">
           <Header onClose={() => setShowAvatar(false)} />
+          <ChatHistory />
           <ChatInput 
             inputRef={input}
             onSend={sendMessage}

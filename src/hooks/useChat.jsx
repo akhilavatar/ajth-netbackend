@@ -1,18 +1,53 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import axios from "axios";
 import { useContentStore } from "../store/content";
+import { useNavigate } from "react-router-dom";
 
 const backendUrl = import.meta.env.VITE_API_URL || "http://localhost:3000";
+const ELEVEN_LABS_API_KEY = "sk_1bf26f5f2ac6e9712644981e24fa71e9ee1ed7178fd885e7";
+const VOICE_ID = "xctasy8XvGp2cVO9HL9k";
 
 const ChatContext = createContext();
 
 export const ChatProvider = ({ children }) => {
   const { setContentType } = useContentStore();
+  const navigate = useNavigate();
+  const [chatHistory, setChatHistory] = useState([]);
   
+  const synthesizeSpeech = async (text) => {
+    try {
+      const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}`, {
+        method: 'POST',
+        headers: {
+          'Accept': 'audio/mpeg',
+          'Content-Type': 'application/json',
+          'xi-api-key': ELEVEN_LABS_API_KEY
+        },
+        body: JSON.stringify({
+          text,
+          model_id: 'eleven_monolingual_v1',
+          voice_settings: {
+            stability: 0.5,
+            similarity_boost: 0.5
+          }
+        })
+      });
+
+      const blob = await response.blob();
+      return URL.createObjectURL(blob);
+    } catch (error) {
+      console.error('Speech synthesis failed:', error);
+      return null;
+    }
+  };
+
   const chat = async (message) => {
     setLoading(true);
     try {
-      // First try to search for content
+      // Add user message to chat history
+      setChatHistory(prev => [...prev, { role: 'user', content: message }]);
+
+      // Handle search queries
       if (message.toLowerCase().includes('search') || message.toLowerCase().includes('find')) {
         const searchTerm = message.replace(/search|find|for/gi, '').trim();
         
@@ -21,11 +56,21 @@ export const ChatProvider = ({ children }) => {
         if (movieRes.data.content.length > 0) {
           setContentType('movie');
           const content = movieRes.data.content[0];
+          const response = `I found "${content.title}". Would you like to watch it?`;
+          
+          // Generate speech for the response
+          const audioUrl = await synthesizeSpeech(response);
+          
           setMessages([{
-            text: `I found "${content.title}". Would you like to watch it?`,
+            text: response,
             searchResult: content,
-            type: 'movie'
+            type: 'movie',
+            audio: audioUrl
           }]);
+          
+          // Add response to chat history
+          setChatHistory(prev => [...prev, { role: 'assistant', content: response }]);
+          
           return;
         }
 
@@ -34,29 +79,53 @@ export const ChatProvider = ({ children }) => {
         if (tvRes.data.content.length > 0) {
           setContentType('tv');
           const content = tvRes.data.content[0];
+          const response = `I found "${content.name}". Would you like to watch it?`;
+          
+          // Generate speech for the response
+          const audioUrl = await synthesizeSpeech(response);
+          
           setMessages([{
-            text: `I found "${content.name}". Would you like to watch it?`,
+            text: response,
             searchResult: content,
-            type: 'tv'
+            type: 'tv',
+            audio: audioUrl
           }]);
+          
+          // Add response to chat history
+          setChatHistory(prev => [...prev, { role: 'assistant', content: response }]);
+          
           return;
         }
 
-        // If nothing found
+        const notFoundResponse = "I couldn't find any movies or TV shows matching your search. Please try a different search term.";
+        const audioUrl = await synthesizeSpeech(notFoundResponse);
+        
         setMessages([{
-          text: "I couldn't find any movies or TV shows matching your search. Please try a different search term.",
+          text: notFoundResponse,
+          audio: audioUrl
         }]);
+        
+        // Add response to chat history
+        setChatHistory(prev => [...prev, { role: 'assistant', content: notFoundResponse }]);
+        
         return;
       }
 
       // If it's a "yes" response to watching content
       if (message.toLowerCase().includes('yes') && messages[0]?.searchResult) {
         const content = messages[0].searchResult;
-        // Instead of using navigate, we'll use window.location
-        window.location.href = `/watch/${content.id}`;
+        const response = `Great! Taking you to watch ${content.title || content.name}.`;
+        const audioUrl = await synthesizeSpeech(response);
+        
         setMessages([{
-          text: `Great! Taking you to watch ${content.title || content.name}.`
+          text: response,
+          audio: audioUrl
         }]);
+        
+        // Add response to chat history
+        setChatHistory(prev => [...prev, { role: 'assistant', content: response }]);
+        
+        navigate(`/watch/${content.id}`);
         return;
       }
 
@@ -69,11 +138,38 @@ export const ChatProvider = ({ children }) => {
         body: JSON.stringify({ message }),
       });
       const resp = (await data.json()).messages;
-      setMessages((messages) => [...messages, ...resp]);
+      
+      // Generate speech for each message
+      const messagesWithAudio = await Promise.all(
+        resp.map(async (msg) => ({
+          ...msg,
+          audio: await synthesizeSpeech(msg.text)
+        }))
+      );
+      
+      setMessages((messages) => [...messages, ...messagesWithAudio]);
+      
+      // Add responses to chat history
+      setChatHistory(prev => [
+        ...prev,
+        ...messagesWithAudio.map(msg => ({
+          role: 'assistant',
+          content: msg.text
+        }))
+      ]);
+      
     } catch (error) {
+      const errorMessage = "I'm sorry, I encountered an error. Please try again.";
+      const audioUrl = await synthesizeSpeech(errorMessage);
+      
       setMessages([{
-        text: "I'm sorry, I encountered an error. Please try again."
+        text: errorMessage,
+        audio: audioUrl
       }]);
+      
+      // Add error response to chat history
+      setChatHistory(prev => [...prev, { role: 'assistant', content: errorMessage }]);
+      
     } finally {
       setLoading(false);
     }
@@ -105,6 +201,7 @@ export const ChatProvider = ({ children }) => {
         loading,
         cameraZoomed,
         setCameraZoomed,
+        chatHistory
       }}
     >
       {children}
