@@ -57,6 +57,23 @@ export const ChatProvider = ({ children }) => {
       // Add user message to chat history
       setChatHistory(prev => [...prev, { role: 'user', content: message }]);
 
+      // Check for greeting
+      if (message.toLowerCase().includes('hi netflix')) {
+        const response = "Hi! How can I help you today?";
+        const audioUrl = await synthesizeSpeech(response);
+        if (!audioUrl) throw new Error('Failed to generate speech');
+        
+        setMessages([{
+          text: response,
+          audio: audioUrl,
+          lipsync: await generateLipSync(response)
+        }]);
+        
+        // Add response to chat history
+        setChatHistory(prev => [...prev, { role: 'assistant', content: response }]);
+        return;
+      }
+
       // Handle search queries
       if (message.toLowerCase().includes('search') || message.toLowerCase().includes('find')) {
         const searchTerm = message.replace(/search|find|for/gi, '').trim();
@@ -190,7 +207,7 @@ export const ChatProvider = ({ children }) => {
       
     } catch (error) {
       console.error('Chat error:', error);
-      const errorMessage = "I'm sorry, I encountered an error. Please try again.";
+      const errorMessage = "I'm sorry, I encountered an error. Please try again. If the problem persists, please check your internet connection or try refreshing the page.";
       
       // Ensure we get audio for the error message
       let audioUrl;
