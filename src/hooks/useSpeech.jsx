@@ -9,6 +9,8 @@ export const useSpeech = () => {
   const [error, setError] = useState(null);
   const [audioStream, setAudioStream] = useState(null);
   const [audioContext, setAudioContext] = useState(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const MAX_RETRIES = 3;
 
   const initializeAudioContext = () => {
     if (audioContext) {
@@ -21,7 +23,7 @@ export const useSpeech = () => {
 
   useEffect(() => {
     if (!('webkitSpeechRecognition' in window)) {
-      setError('Speech recognition is not supported in this browser');
+      setError('Speech recognition is not supported in this browser. Please try using Chrome.');
       return;
     }
 
@@ -33,38 +35,62 @@ export const useSpeech = () => {
       recognition.lang = 'en-US';
 
       recognition.onerror = async (event) => {
-        console.error('Speech recognition error:', event.error);
-        
         if (event.error === 'no-speech') {
-          setError('No speech detected. Please try again and speak clearly.');
+          if (retryCount < MAX_RETRIES) {
+            setRetryCount(prev => prev + 1);
+            setTimeout(() => {
+              if (recognition && isListening) {
+                recognition.start();
+              }
+            }, 100);
+          } else {
+            setError('No speech detected. Please check your microphone and try again.');
+            setIsListening(false);
+            setRetryCount(0);
+          }
         } else if (event.error === 'not-allowed') {
           try {
             const permissionStatus = await navigator.permissions.query({ name: 'microphone' });
             if (permissionStatus.state === 'denied') {
-              setError('Microphone permission is required. Please enable it in your browser settings.');
+              setError('Microphone access is blocked. Please allow microphone access in your browser settings.');
+            } else {
+              setError('Microphone permission is required. Please allow access when prompted.');
             }
           } catch (error) {
-            console.error('Error checking microphone permission:', error);
+            setError('Unable to access microphone. Please check your browser settings.');
           }
+          setIsListening(false);
+        } else if (event.error === 'audio-capture') {
+          setError('No microphone detected. Please connect a microphone and try again.');
+          setIsListening(false);
+        } else if (event.error === 'network') {
+          setError('Network error occurred. Please check your internet connection.');
+          setIsListening(false);
         } else {
-          setError(`Speech recognition error: ${event.error}`);
+          setError(`Speech recognition error: ${event.error}. Please try again.`);
+          setIsListening(false);
         }
-        
-        setIsListening(false);
       };
 
       recognition.onresult = (event) => {
         const transcript = event.results[0][0].transcript;
         setTranscript(transcript);
         setError(null);
+        setRetryCount(0);
       };
 
       recognition.onend = () => {
-        setIsListening(false);
+        if (isListening && retryCount < MAX_RETRIES) {
+          recognition.start();
+        } else {
+          setIsListening(false);
+          setRetryCount(0);
+        }
       };
 
       recognition.onaudiostart = () => {
         setError(null);
+        setRetryCount(0);
       };
 
       return recognition;
@@ -78,40 +104,54 @@ export const useSpeech = () => {
         const devices = await navigator.mediaDevices.enumerateDevices();
         const audioInputs = devices.filter(device => device.kind === 'audioinput');
         
-        if (audioInputs.length === 0 && retryCount < 3) {
-          setTimeout(() => detectDevices(retryCount + 1), 1000);
+        if (audioInputs.length === 0) {
+          if (retryCount < 3) {
+            setTimeout(() => detectDevices(retryCount + 1), 1000);
+          } else {
+            setError('No audio input devices found. Please connect a microphone.');
+          }
           return;
         }
         
         setAvailableDevices(audioInputs);
-        console.log('Available audio input devices:', audioInputs);
 
-        // Prefer Bluetooth devices
+        // Try devices in priority order: Bluetooth > Default > Others
         const bluetoothDevice = audioInputs.find(device => 
           device.label.toLowerCase().includes('bluetooth') ||
           device.label.toLowerCase().includes('wireless')
         );
+        const defaultDevice = audioInputs.find(device => 
+          device.deviceId === 'default' || 
+          device.label.toLowerCase().includes('default')
+        );
 
-        if (bluetoothDevice) {
-          await verifyAndSelectDevice(bluetoothDevice, ctx);
-        } else {
-          // Try each device until we find one that works
-          for (const device of audioInputs) {
-            if (await verifyAndSelectDevice(device, ctx)) {
-              break;
-            }
+        // Try bluetooth first, then default, then others
+        const devicesToTry = [
+          bluetoothDevice,
+          defaultDevice,
+          ...audioInputs.filter(d => d !== bluetoothDevice && d !== defaultDevice)
+        ].filter(Boolean);
+
+        let deviceFound = false;
+        for (const device of devicesToTry) {
+          if (await verifyAndSelectDevice(device, ctx)) {
+            deviceFound = true;
+            break;
           }
         }
+
+        if (!deviceFound) {
+          setError('No working microphone found. Please check your microphone connection and settings.');
+        }
       } catch (error) {
-        console.error('Error detecting audio devices:', error);
-        setError('Error detecting audio devices. Please check your microphone connection.');
+        setError('Unable to detect audio devices. Please check your microphone connection.');
       }
     };
 
     detectDevices();
 
-    const handleDeviceChange = async () => {
-      await detectDevices();
+    const handleDeviceChange = () => {
+      detectDevices();
     };
 
     navigator.mediaDevices.addEventListener('devicechange', handleDeviceChange);
@@ -128,6 +168,8 @@ export const useSpeech = () => {
   }, []);
 
   const verifyAndSelectDevice = async (device, context) => {
+    if (!device) return false;
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -135,8 +177,8 @@ export const useSpeech = () => {
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
-          sampleRate: 48000, // Higher sample rate for better quality
-          channelCount: 1 // Mono for better speech recognition
+          sampleRate: 48000,
+          channelCount: 1
         }
       });
 
@@ -144,12 +186,15 @@ export const useSpeech = () => {
       if (isWorking) {
         setSelectedDevice(device);
         stream.getTracks().forEach(track => track.stop());
+        setError(null);
         return true;
       }
+      
+      stream.getTracks().forEach(track => track.stop());
+      return false;
     } catch (err) {
-      console.warn(`Device ${device.label} not working:`, err);
+      return false;
     }
-    return false;
   };
 
   const testAudioInput = async (stream, context, timeout = 2000) => {
@@ -166,11 +211,10 @@ export const useSpeech = () => {
 
         const checkLevel = () => {
           analyser.getByteFrequencyData(dataArray);
-          // Use a more sophisticated detection method
           const average = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
           const peak = Math.max(...dataArray);
           
-          if (average > 5 || peak > 20) { // More sensitive thresholds
+          if (average > 5 || peak > 20) {
             detected = true;
             clearInterval(intervalId);
             clearTimeout(detectionTimer);
@@ -178,14 +222,13 @@ export const useSpeech = () => {
           }
         };
 
-        const intervalId = setInterval(checkLevel, 50); // Check more frequently
+        const intervalId = setInterval(checkLevel, 50);
         
         detectionTimer = setTimeout(() => {
           clearInterval(intervalId);
           resolve(detected);
         }, timeout);
       } catch (err) {
-        console.error('Error in testAudioInput:', err);
         resolve(false);
       }
     });
@@ -193,7 +236,7 @@ export const useSpeech = () => {
 
   const startListening = async () => {
     if (!recognition) {
-      setError('Speech recognition is not initialized');
+      setError('Speech recognition is not initialized. Please refresh the page.');
       return;
     }
 
@@ -202,47 +245,60 @@ export const useSpeech = () => {
         audioStream.getTracks().forEach(track => track.stop());
       }
 
-      // Reinitialize audio context to handle device switches
       const ctx = initializeAudioContext();
 
+      // If no device is selected or current device isn't working, try to find a working device
+      if (!selectedDevice || !(await verifyAndSelectDevice(selectedDevice, ctx))) {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const audioInputs = devices.filter(device => device.kind === 'audioinput');
+        
+        let deviceFound = false;
+        for (const device of audioInputs) {
+          if (await verifyAndSelectDevice(device, ctx)) {
+            deviceFound = true;
+            break;
+          }
+        }
+        
+        if (!deviceFound) {
+          throw new Error('No working microphone found. Please check your microphone connection and settings.');
+        }
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: selectedDevice ? {
+        audio: {
           deviceId: { exact: selectedDevice.deviceId },
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
           sampleRate: 48000,
           channelCount: 1
-        } : true
+        }
       });
 
-      // Test with longer timeout for Bluetooth devices
       const timeout = selectedDevice?.label.toLowerCase().includes('bluetooth') ? 5000 : 3000;
       const hasAudio = await testAudioInput(stream, ctx, timeout);
       
       if (!hasAudio) {
-        throw new Error(
-          'No audio input detected. Please check:\n' +
-          '1. Your microphone is not muted\n' +
-          '2. You are speaking into the microphone\n' +
-          '3. The correct audio device is selected'
-        );
+        throw new Error('No audio input detected. Please check:\n1. Your microphone is not muted\n2. You are speaking into the microphone\n3. The correct audio device is selected');
       }
 
       setAudioStream(stream);
+      setRetryCount(0);
       recognition.start();
       setIsListening(true);
       setTranscript('');
       setError(null);
 
     } catch (error) {
-      console.error('Error starting speech recognition:', error);
       if (error.name === 'NotAllowedError') {
-        setError('Microphone access denied. Please allow microphone access and try again.');
+        setError('Microphone access denied. Please allow microphone access in your browser settings.');
       } else if (error.name === 'NotFoundError') {
         setError('No microphone found. Please connect a microphone and try again.');
+      } else if (error.name === 'NotReadableError') {
+        setError('Microphone is already in use by another application. Please close other apps using the microphone.');
       } else {
-        setError(error.message || 'Failed to start speech recognition');
+        setError(error.message || 'Failed to start speech recognition. Please try again.');
       }
       setIsListening(false);
     }
@@ -258,6 +314,7 @@ export const useSpeech = () => {
       }
       setIsListening(false);
       setAudioStream(null);
+      setRetryCount(0);
     } catch (error) {
       console.error('Error stopping speech recognition:', error);
     }
@@ -270,13 +327,12 @@ export const useSpeech = () => {
         stopListening();
       }
       
-      // Reinitialize audio context for new device
       const ctx = initializeAudioContext();
       
-      // Verify the new device works
-      const works = await verifyAndSelectDevice(device, ctx);
-      if (!works) {
-        setError('Selected device is not working. Please try another device.');
+      if (await verifyAndSelectDevice(device, ctx)) {
+        setError(null);
+      } else {
+        setError('Selected device is not working. Please try another device or check your microphone settings.');
       }
     }
   };
