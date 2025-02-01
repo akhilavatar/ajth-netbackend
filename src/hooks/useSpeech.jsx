@@ -8,9 +8,18 @@ export const useSpeech = () => {
   const [selectedDevice, setSelectedDevice] = useState(null);
   const [error, setError] = useState(null);
   const [audioStream, setAudioStream] = useState(null);
+  const [audioContext, setAudioContext] = useState(null);
+
+  const initializeAudioContext = () => {
+    if (audioContext) {
+      audioContext.close();
+    }
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    setAudioContext(ctx);
+    return ctx;
+  };
 
   useEffect(() => {
-    // Check for browser support
     if (!('webkitSpeechRecognition' in window)) {
       setError('Speech recognition is not supported in this browser');
       return;
@@ -18,17 +27,15 @@ export const useSpeech = () => {
 
     const createRecognition = () => {
       const recognition = new window.webkitSpeechRecognition();
-      // Critical changes to improve recognition
-      recognition.continuous = false; // Changed to false to prevent buffering issues
-      recognition.interimResults = false; // Changed to false for more reliable results
-      recognition.maxAlternatives = 1; // Reduced to get most confident result
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
       recognition.lang = 'en-US';
 
       recognition.onerror = async (event) => {
         console.error('Speech recognition error:', event.error);
         
         if (event.error === 'no-speech') {
-          // Instead of retrying automatically, we'll let the user try again
           setError('No speech detected. Please try again and speak clearly.');
         } else if (event.error === 'not-allowed') {
           try {
@@ -64,29 +71,37 @@ export const useSpeech = () => {
     };
 
     setRecognition(createRecognition());
+    const ctx = initializeAudioContext();
 
-    // Enhanced device detection
-    const detectDevices = async () => {
+    const detectDevices = async (retryCount = 0) => {
       try {
         const devices = await navigator.mediaDevices.enumerateDevices();
         const audioInputs = devices.filter(device => device.kind === 'audioinput');
         
+        if (audioInputs.length === 0 && retryCount < 3) {
+          setTimeout(() => detectDevices(retryCount + 1), 1000);
+          return;
+        }
+        
         setAvailableDevices(audioInputs);
         console.log('Available audio input devices:', audioInputs);
 
-        // Auto-select Bluetooth device if available
+        // Prefer Bluetooth devices
         const bluetoothDevice = audioInputs.find(device => 
           device.label.toLowerCase().includes('bluetooth') ||
           device.label.toLowerCase().includes('wireless')
         );
 
         if (bluetoothDevice) {
-          setSelectedDevice(bluetoothDevice);
-          console.log('Selected Bluetooth device:', bluetoothDevice);
+          await verifyAndSelectDevice(bluetoothDevice, ctx);
         } else {
-          setSelectedDevice(audioInputs[0]);
+          // Try each device until we find one that works
+          for (const device of audioInputs) {
+            if (await verifyAndSelectDevice(device, ctx)) {
+              break;
+            }
+          }
         }
-
       } catch (error) {
         console.error('Error detecting audio devices:', error);
         setError('Error detecting audio devices. Please check your microphone connection.');
@@ -95,16 +110,86 @@ export const useSpeech = () => {
 
     detectDevices();
 
-    // Listen for device changes
-    navigator.mediaDevices.addEventListener('devicechange', detectDevices);
+    const handleDeviceChange = async () => {
+      await detectDevices();
+    };
+
+    navigator.mediaDevices.addEventListener('devicechange', handleDeviceChange);
 
     return () => {
-      navigator.mediaDevices.removeEventListener('devicechange', detectDevices);
+      navigator.mediaDevices.removeEventListener('devicechange', handleDeviceChange);
       if (audioStream) {
         audioStream.getTracks().forEach(track => track.stop());
       }
+      if (audioContext) {
+        audioContext.close();
+      }
     };
   }, []);
+
+  const verifyAndSelectDevice = async (device, context) => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          deviceId: { exact: device.deviceId },
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          sampleRate: 48000, // Higher sample rate for better quality
+          channelCount: 1 // Mono for better speech recognition
+        }
+      });
+
+      const isWorking = await testAudioInput(stream, context);
+      if (isWorking) {
+        setSelectedDevice(device);
+        stream.getTracks().forEach(track => track.stop());
+        return true;
+      }
+    } catch (err) {
+      console.warn(`Device ${device.label} not working:`, err);
+    }
+    return false;
+  };
+
+  const testAudioInput = async (stream, context, timeout = 2000) => {
+    return new Promise((resolve) => {
+      try {
+        const source = context.createMediaStreamSource(stream);
+        const analyser = context.createAnalyser();
+        analyser.fftSize = 2048;
+        source.connect(analyser);
+
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+        let detectionTimer = null;
+        let detected = false;
+
+        const checkLevel = () => {
+          analyser.getByteFrequencyData(dataArray);
+          // Use a more sophisticated detection method
+          const average = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
+          const peak = Math.max(...dataArray);
+          
+          if (average > 5 || peak > 20) { // More sensitive thresholds
+            detected = true;
+            clearInterval(intervalId);
+            clearTimeout(detectionTimer);
+            resolve(true);
+          }
+        };
+
+        const intervalId = setInterval(checkLevel, 50); // Check more frequently
+        
+        detectionTimer = setTimeout(() => {
+          clearInterval(intervalId);
+          resolve(detected);
+        }, timeout);
+      } catch (err) {
+        console.error('Error in testAudioInput:', err);
+        resolve(false);
+      }
+    });
+  };
 
   const startListening = async () => {
     if (!recognition) {
@@ -113,60 +198,51 @@ export const useSpeech = () => {
     }
 
     try {
-      // Stop any existing audio stream
       if (audioStream) {
         audioStream.getTracks().forEach(track => track.stop());
       }
 
-      // Configure audio constraints
-      const constraints = {
+      // Reinitialize audio context to handle device switches
+      const ctx = initializeAudioContext();
+
+      const stream = await navigator.mediaDevices.getUserMedia({
         audio: selectedDevice ? {
           deviceId: { exact: selectedDevice.deviceId },
-          echoCancellation: false, // Disabled to prevent interference
+          echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
-          sampleRate: 44100, // Specify standard sample rate
-          channelCount: 1 // Mono audio for better recognition
+          sampleRate: 48000,
+          channelCount: 1
         } : true
-      };
+      });
 
-      // Request microphone access
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      setAudioStream(stream);
-
-      // Create audio context to verify audio input
-      const audioContext = new AudioContext();
-      const source = audioContext.createMediaStreamSource(stream);
-      const analyser = audioContext.createAnalyser();
-      source.connect(analyser);
-
-      // Verify audio input is working
-      const dataArray = new Uint8Array(analyser.frequencyBinCount);
-      analyser.getByteFrequencyData(dataArray);
+      // Test with longer timeout for Bluetooth devices
+      const timeout = selectedDevice?.label.toLowerCase().includes('bluetooth') ? 5000 : 3000;
+      const hasAudio = await testAudioInput(stream, ctx, timeout);
       
-      if (dataArray.some(value => value > 0)) {
-        // Audio input detected, start recognition
-        recognition.start();
-        setIsListening(true);
-        setTranscript('');
-        setError(null);
-      } else {
-        throw new Error('No audio input detected from microphone');
+      if (!hasAudio) {
+        throw new Error(
+          'No audio input detected. Please check:\n' +
+          '1. Your microphone is not muted\n' +
+          '2. You are speaking into the microphone\n' +
+          '3. The correct audio device is selected'
+        );
       }
 
-      // Clean up audio context
-      setTimeout(() => {
-        audioContext.close();
-      }, 1000);
+      setAudioStream(stream);
+      recognition.start();
+      setIsListening(true);
+      setTranscript('');
+      setError(null);
 
     } catch (error) {
       console.error('Error starting speech recognition:', error);
       if (error.name === 'NotAllowedError') {
-        setError('Microphone access is required. Please allow microphone access and try again.');
+        setError('Microphone access denied. Please allow microphone access and try again.');
       } else if (error.name === 'NotFoundError') {
         setError('No microphone found. Please connect a microphone and try again.');
       } else {
-        setError(`Failed to start speech recognition: ${error.message}`);
+        setError(error.message || 'Failed to start speech recognition');
       }
       setIsListening(false);
     }
@@ -190,9 +266,17 @@ export const useSpeech = () => {
   const selectDevice = async (deviceId) => {
     const device = availableDevices.find(d => d.deviceId === deviceId);
     if (device) {
-      setSelectedDevice(device);
       if (isListening) {
         stopListening();
+      }
+      
+      // Reinitialize audio context for new device
+      const ctx = initializeAudioContext();
+      
+      // Verify the new device works
+      const works = await verifyAndSelectDevice(device, ctx);
+      if (!works) {
+        setError('Selected device is not working. Please try another device.');
       }
     }
   };
