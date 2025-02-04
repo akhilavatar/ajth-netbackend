@@ -5,39 +5,35 @@ import { Mic, MicOff, Settings } from 'lucide-react';
 import { useAudioDevices } from '../hooks/useAudioDevices';
 
 export const ChatInput = ({ inputRef, onSend, onKeyDown, disabled }) => {
-  const { isListening, transcript, startListening, stopListening, availableDevices, selectedDevice, selectDevice, error } = useSpeech();
+  const { isListening, transcript, startListening, stopListening, error: speechError } = useSpeech();
   const { chat } = useChat();
   const [showDeviceSelector, setShowDeviceSelector] = useState(false);
   const { audioLevel, audioInputs, selectedInput, selectDevice: selectAudioDevice } = useAudioDevices();
   const [audioLog, setAudioLog] = useState([]);
 
+  // Fix infinite update by adding proper dependency array
   useEffect(() => {
-    if (transcript) {
-      if (inputRef.current) {
-        inputRef.current.value = transcript;
-      }
-      // Automatically send the transcribed message
-      chat(transcript);
-      // Clear the input after sending
-      if (inputRef.current) {
-        inputRef.current.value = '';
-      }
-    }
-  }, [transcript, chat]);
-
-  useEffect(() => {
-    if (audioLevel > 0.1) { // Threshold for logging
+    if (audioLevel > 0.1) {
       const timestamp = new Date().toLocaleTimeString();
-      setAudioLog(prev => [...prev, {
+      setAudioLog(prev => [...prev.slice(-4), {
         time: timestamp,
         level: audioLevel
-      }].slice(-5)); // Keep last 5 entries
+      }]);
     }
   }, [audioLevel]);
 
+  // Fix infinite update by adding proper dependency array and moving transcript handling
+  useEffect(() => {
+    if (transcript && inputRef.current) {
+      inputRef.current.value = transcript;
+      chat(transcript).catch(console.error);
+      inputRef.current.value = '';
+    }
+  }, [transcript, chat, inputRef]);
+
   const handleMicClick = async () => {
-    if (error) {
-      alert(error);
+    if (speechError) {
+      alert(speechError);
       return;
     }
 
@@ -50,9 +46,8 @@ export const ChatInput = ({ inputRef, onSend, onKeyDown, disabled }) => {
 
   return (
     <div className="flex flex-col gap-2 pointer-events-auto max-w-screen-sm w-full mx-auto">
-      {error && <div className="text-red-500 text-sm">{error}</div>}
+      {speechError && <div className="text-red-500 text-sm">{speechError}</div>}
       
-      {/* Audio Level Indicator */}
       {isListening && (
         <div className="w-full bg-white/10 rounded-lg p-2">
           <div className="w-full h-2 bg-gray-200 rounded overflow-hidden">
@@ -62,7 +57,6 @@ export const ChatInput = ({ inputRef, onSend, onKeyDown, disabled }) => {
             />
           </div>
           
-          {/* Audio Log */}
           <div className="mt-2 text-xs text-white/80">
             {audioLog.map((entry, index) => (
               <div key={index}>
