@@ -4,12 +4,12 @@ import { useContentStore } from "../store/content";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 
-const backendUrl = import.meta.env.VITE_API_URL || "http://localhost:3000";
-const ELEVEN_LABS_API_KEY = "sk_1bf26f5f2ac6e9712644981e24fa71e9ee1ed7178fd885e7";
-const VOICE_ID = "xctasy8XvGp2cVO9HL9k";
+const backendUrl = import.meta.env.VITE_API_URL || "https://netflix-avatar-chat-backend.onrender.com";
+const ELEVEN_LABS_API_KEY = import.meta.env.VITE_ELEVEN_LABS_API_KEY;
+const VOICE_ID = import.meta.env.VITE_ELEVEN_LABS_VOICE_ID || "xctasy8XvGp2cVO9HL9k";
 
-const MAX_RETRIES = 3;
-const RETRY_DELAY = 1000;
+const MAX_RETRIES = 1;
+const RETRY_DELAY = 3;
 
 const ChatContext = createContext();
 
