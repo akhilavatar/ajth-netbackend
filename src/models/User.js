@@ -1,28 +1,40 @@
 import mongoose from 'mongoose';
 
 const userSchema = new mongoose.Schema({
-  email: {
-    type: String,
-    required: true,
-    unique: true,
-    lowercase: true,
-    trim: true
-  },
   username: {
     type: String,
-    required: true,
+    required: [true, 'Username is required'],
     unique: true,
     trim: true,
-    minlength: 3,
-    maxlength: 20
+    minlength: [3, 'Username must be at least 3 characters long'],
+    maxlength: [30, 'Username cannot exceed 30 characters']
+  },
+  email: {
+    type: String,
+    required: [true, 'Email is required'],
+    unique: true,
+    trim: true,
+    lowercase: true,
+    match: [/^\S+@\S+\.\S+$/, 'Please enter a valid email address']
   },
   password: {
     type: String,
-    required: true
+    required: [true, 'Password is required'],
+    minlength: [8, 'Password must be at least 8 characters long']
   },
   image: {
     type: String,
-    required: true
+    default: ''
+  },
+  searchHistory: {
+    type: [{
+      query: String,
+      timestamp: {
+        type: Date,
+        default: Date.now
+      }
+    }],
+    default: []
   }
 }, {
   timestamps: true
