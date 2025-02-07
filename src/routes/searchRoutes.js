@@ -18,7 +18,7 @@ router.get('/movie/:query', searchMovies);
 router.get('/tv/:query', searchTVShows);
 router.get('/person/:query', searchPeople);
 
-// History management endpoints
+// Search history management endpoints
 router.get('/history', getSearchHistory);
 router.delete('/history/:id', deleteSearchHistoryItem);
 
