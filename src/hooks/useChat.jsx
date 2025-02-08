@@ -278,3 +278,7 @@ export const useChat = () => {
   }
   return context;
 };
+
+export { ChatProvider }
+
+export { useChat }
