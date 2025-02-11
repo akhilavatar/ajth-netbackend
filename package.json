@@ -7,8 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "server": "node src/server.js",
-    "dev:server": "nodemon src/server.js"
+    "server": "node server/index.js",
+    "dev:server": "nodemon server/index.js"
   },
   "dependencies": {
     "@react-three/drei": "9.75.0",
@@ -25,6 +25,7 @@
     "leva": "^0.9.35",
     "lucide-react": "^0.294.0",
     "mongoose": "^8.0.3",
+    "nodeman": "^1.1.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-hot-toast": "^2.4.1",
