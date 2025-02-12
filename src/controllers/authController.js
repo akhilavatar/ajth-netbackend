@@ -7,7 +7,7 @@ const SALT_ROUNDS = 12;
 const TOKEN_EXPIRY = '24h';
 const COOKIE_OPTIONS = {
   httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
+  // secure: process.env.NODE_ENV === 'production',
   sameSite: 'strict',
   maxAge: 24 * 60 * 60 * 1000 // 24 hours
 };
@@ -141,7 +141,7 @@ export const logout = async (req, res) => {
   try {
     res.clearCookie('token', {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      // secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict'
     });
     return res.json({ message: 'Logged out successfully' });

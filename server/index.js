@@ -25,6 +25,11 @@ app.use(cors({
 app.use(express.json());
 app.use(cookieParser());
 
+// Root route
+app.get('/', (req, res) => {
+  res.json({ message: 'Netflix Clone API is running!' });
+});
+
 // Routes
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/movie', movieRoutes);
@@ -39,6 +44,7 @@ app.use((err, req, res, next) => {
 
 // Start server
 const PORT = process.env.PORT || 3000;
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
