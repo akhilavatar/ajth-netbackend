@@ -61,59 +61,58 @@ export const ChatProvider = ({ children }) => {
       if (message.toLowerCase().includes('search') || message.toLowerCase().includes('find')) {
         const searchTerm = message.replace(/search|find|for/gi, '').trim();
         
-        // Try searching in movies first
-        const movieRes = await axios.get(`/api/v1/search/movie/${searchTerm}`);
-        if (movieRes.data.content.length > 0) {
-          setContentType('movie');
-          const content = movieRes.data.content[0];
-          const response = `I found "${content.title}". Would you like to watch it?`;
-          
-          // Generate speech for the response
-          const audioUrl = await synthesizeSpeech(response);
-          if (!audioUrl) throw new Error('Failed to generate speech');
-          
-          setMessages([{
-            text: response,
-            searchResult: content,
-            type: 'movie',
-            audio: audioUrl,
-            lipsync: await generateLipSync(response)
-          }]);
-          
-          // Add response to chat history
-          setChatHistory(prev => [...prev, { role: 'assistant', content: response }]);
-          
-          return;
-        }
+        try {
+          // Try searching in movies first
+          const movieRes = await axios.get(`/api/v1/search/movie/${searchTerm}`);
+          if (movieRes.data.content.length > 0) {
+            setContentType('movie');
+            const content = movieRes.data.content[0];
+            const response = `I found "${content.title}". Would you like to watch it?`;
+            
+            // Generate speech for the response
+            const audioUrl = await synthesizeSpeech(response);
+            if (!audioUrl) throw new Error('Failed to generate speech');
+            
+            setMessages([{
+              text: response,
+              searchResult: content,
+              type: 'movie',
+              audio: audioUrl,
+              lipsync: await generateLipSync(response)
+            }]);
+            
+            // Add response to chat history
+            setChatHistory(prev => [...prev, { role: 'assistant', content: response }]);
+            return;
+          }
 
-        // If no movies found, try TV shows
-        const tvRes = await axios.get(`/api/v1/search/tv/${searchTerm}`);
-        if (tvRes.data.content.length > 0) {
-          setContentType('tv');
-          const content = tvRes.data.content[0];
-          const response = `I found "${content.name}". Would you like to watch it?`;
-          
-          // Generate speech for the response
-          const audioUrl = await synthesizeSpeech(response);
-          if (!audioUrl) throw new Error('Failed to generate speech');
-          
-          setMessages([{
-            text: response,
-            searchResult: content,
-            type: 'tv',
-            audio: audioUrl,
-            lipsync: await generateLipSync(response)
-          }]);
-          
-          // Add response to chat history
-          setChatHistory(prev => [...prev, { role: 'assistant', content: response }]);
-          
-          return;
+          // If no movies found, try TV shows
+          const tvRes = await axios.get(`/api/v1/search/tv/${searchTerm}`);
+          if (tvRes.data.content.length > 0) {
+            setContentType('tv');
+            const content = tvRes.data.content[0];
+            const response = `I found "${content.name}". Would you like to watch it?`;
+            
+            const audioUrl = await synthesizeSpeech(response);
+            if (!audioUrl) throw new Error('Failed to generate speech');
+            
+            setMessages([{
+              text: response,
+              searchResult: content,
+              type: 'tv',
+              audio: audioUrl,
+              lipsync: await generateLipSync(response)
+            }]);
+            
+            setChatHistory(prev => [...prev, { role: 'assistant', content: response }]);
+            return;
+          }
+        } catch (error) {
+          console.error('Search error:', error);
         }
 
         const notFoundResponse = "I couldn't find any movies or TV shows matching your search. Please try a different search term.";
         const audioUrl = await synthesizeSpeech(notFoundResponse);
-        if (!audioUrl) throw new Error('Failed to generate speech');
         
         setMessages([{
           text: notFoundResponse,
@@ -121,9 +120,7 @@ export const ChatProvider = ({ children }) => {
           lipsync: await generateLipSync(notFoundResponse)
         }]);
         
-        // Add response to chat history
         setChatHistory(prev => [...prev, { role: 'assistant', content: notFoundResponse }]);
-        
         return;
       }
 
@@ -132,7 +129,6 @@ export const ChatProvider = ({ children }) => {
         const content = messages[0].searchResult;
         const response = `Great! Taking you to watch ${content.title || content.name}.`;
         const audioUrl = await synthesizeSpeech(response);
-        if (!audioUrl) throw new Error('Failed to generate speech');
         
         setMessages([{
           text: response,
@@ -140,10 +136,12 @@ export const ChatProvider = ({ children }) => {
           lipsync: await generateLipSync(response)
         }]);
         
-        // Add response to chat history
         setChatHistory(prev => [...prev, { role: 'assistant', content: response }]);
         
-        navigate(`/watch/${content.id}`);
+        // Use setTimeout to ensure the message is displayed before navigation
+        setTimeout(() => {
+          navigate(`/watch/${content.id}`);
+        }, 1000);
         return;
       }
 
@@ -162,12 +160,9 @@ export const ChatProvider = ({ children }) => {
       
       const resp = (await data.json()).messages;
       
-      // Generate speech and lipsync for each message
       const messagesWithAudio = await Promise.all(
         resp.map(async (msg) => {
           const audioUrl = await synthesizeSpeech(msg.text);
-          if (!audioUrl) throw new Error('Failed to generate speech');
-          
           const lipsync = await generateLipSync(msg.text);
           return {
             ...msg,
@@ -179,7 +174,6 @@ export const ChatProvider = ({ children }) => {
       
       setMessages(messagesWithAudio);
       
-      // Add responses to chat history
       setChatHistory(prev => [
         ...prev,
         ...messagesWithAudio.map(msg => ({
@@ -192,22 +186,7 @@ export const ChatProvider = ({ children }) => {
       console.error('Chat error:', error);
       const errorMessage = "I'm sorry, I encountered an error. Please try again.";
       
-      // Ensure we get audio for the error message
-      let audioUrl;
-      let retries = 3;
-      while (retries > 0 && !audioUrl) {
-        audioUrl = await synthesizeSpeech(errorMessage);
-        retries--;
-        if (!audioUrl) {
-          await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
-        }
-      }
-      
-      if (!audioUrl) {
-        console.error('Failed to generate speech for error message after retries');
-        return;
-      }
-      
+      const audioUrl = await synthesizeSpeech(errorMessage);
       const lipsync = await generateLipSync(errorMessage);
       
       setMessages([{
@@ -216,7 +195,6 @@ export const ChatProvider = ({ children }) => {
         lipsync
       }]);
       
-      // Add error response to chat history
       setChatHistory(prev => [...prev, { role: 'assistant', content: errorMessage }]);
       
     } finally {
@@ -226,7 +204,6 @@ export const ChatProvider = ({ children }) => {
 
   const generateLipSync = async (text) => {
     try {
-      // This is a placeholder - replace with actual API call to get phoneme timing
       const phonemes = text.split('').map((char, index) => ({
         value: char.toUpperCase(),
         start: index * 0.1,
