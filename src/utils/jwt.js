@@ -17,7 +17,7 @@ export const createTokenAndSetCookie = (userId, res) => {
   // Set cookie options
   const cookieOptions = {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: false,
     sameSite: 'strict',
     maxAge: 15 * 24 * 60 * 60 * 1000 // 15 days in milliseconds
   };

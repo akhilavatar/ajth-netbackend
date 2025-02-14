@@ -1,10 +1,5 @@
 import express from 'express';
-import {
-  signup,
-  login,
-  logout,
-  authCheck
-} from '../controllers/authController.js';
+import { signup, login, logout, authCheck } from '../controllers/authController.js';
 import { authJwt } from '../middleware/authJwt.js';
 
 const router = express.Router();
